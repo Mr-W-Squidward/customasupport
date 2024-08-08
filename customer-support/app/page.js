@@ -13,7 +13,8 @@ export default function Home() {
   const sendMessage = async () => {
     if (!message.trim()) return; // Prevent sending empty messages
 
-    setMessages([...messages, { role: 'user', content: message }])
+    const updatedMessages = [...messages, { role: 'user', content: message }]
+    setMessages(updatedMessages)
     setMessage('')
 
     try {
@@ -22,7 +23,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify([...messages, { role: 'user', content: message }]),
+        body: JSON.stringify({ messages: updatedMessages }),
       })
 
       if (!response.ok) {
@@ -31,7 +32,7 @@ export default function Home() {
       }
 
       const data = await response.json()
-      setMessages([...messages, { role: 'assistant', content: data.message }])
+      setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: data.message }])
     } catch (error) {
       console.error('Error fetching response:', error)
     }
@@ -53,7 +54,7 @@ export default function Home() {
         border="1px solid black"
         p={2}
       >
-        <Stack direction={'column'} spacing={2} flexGrow={1}>
+        <Stack direction={'column'} spacing={2} flexGrow={1} overflow="auto">
           {
             messages.map((message, index) => (
               <Box

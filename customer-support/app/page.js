@@ -1,7 +1,7 @@
 "use client"
 
 import { Box, Stack, TextField, Button } from "@mui/material"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 
 export default function Home() {
   const [messages, setMessages] = useState([
@@ -9,34 +9,78 @@ export default function Home() {
   ])
 
   const [message, setMessage] = useState('')
+  const systemPrompt = `
+    Your job is to attentively listen to what the user is saying, and make them feel more comfortable about their situation, while injection humour into your responses. The best humour is puns - try to include at least one per sentence.
+
+    Some example responses:
+
+    Prompt: How do I become a software engineer? I'm feeling a little unsure. 
+    Response: Becoming a software engineer? It’s as easy as coding ABCs! Start learning, practice daily, and debug like a pro-grammer. You’ve got this, no byte about it! 😄
+
+    Prompt: I'm struggling on Leetcode
+    Response: 
+    LeetCode got you in a loop? Just remember, every bug you squash brings you closer to array of success. Keep going—you'll crack the code! 🧩
+    Any previous message history will be listed below:
+  `
 
   const sendMessage = async () => {
-    if (!message.trim()) return; // Prevent sending empty messages
+    if (!message.trim()) return;
 
-    const updatedMessages = [...messages, { role: 'user', content: message }]
-    setMessages(updatedMessages)
-    setMessage('')
+    setMessage('');
+    setMessages((messages) => [
+      ...messages,
+      {role: 'user', content: message},
+      {role: 'assistant', content: ''}
+    ])
+    
+    var unpackedMessages = ''
+    for (let i=0; i<messages.length; i++){
+      unpackedMessages=unpackedMessages+`\n${messages[i]['role']}: ${messages[i]['content']}`
+    }
 
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ messages: updatedMessages }),
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(systemPrompt+unpackedMessages+".\n\n Here is the prompt: "+message),
+    })
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true){
+      const {done, value} = await reader.read()
+
+      if (done) break;
+      const text = decoder.decode(value, {stream: true});
+      setMessages((messages) => {
+        let lastMessage = messages[messages.length-1];
+        let otherMessages = messages.slice(0, messages.length-1);
+        return [
+          ...otherMessages, 
+          {...lastMessage, content: lastMessage.content+text},
+        ]
       })
-
-      if (!response.ok) {
-        console.error('HTTP error:', response.status)
-        return
-      }
-
-      const data = await response.json()
-      setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: data.message }])
-    } catch (error) {
-      console.error('Error fetching response:', error)
     }
   }
+
+  const handleKeyPress = (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   return (
     <Box
@@ -65,21 +109,27 @@ export default function Home() {
                 <Box
                   bgcolor={message.role === 'assistant' ? 'primary.main' : 'secondary.main'}
                   color="white"
-                  borderRadius={16}
-                  p={2}
+                  borderRadius={4}
+                  p={3}
                 >
                   {message.content}
                 </Box>
               </Box>
             ))
           }
+          <div ref={messagesEndRef} />
         </Stack>
-        <Stack direction={'row'} spacing={2}>
+        <Stack
+          direction={'row'}
+          spacing={2}
+          marginTop={2}
+        >
           <TextField
             label="Message"
             fullWidth
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => handleKeyPress(e)}
           />
           <Button variant="contained" onClick={sendMessage}>
             Send

@@ -1,64 +1,49 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const systemPrompt = `
-Welcome to Headstarter Support! I'm here to assist you with any questions or issues you might have about our AI interview platform. Whether you need help navigating our features, have questions about your account, or want tips on getting the most out of your interview preparation, I'm here to help.
+console.log('hi')
 
-How can I assist you today?
-Getting Started:
+var systemPrompt = `
+Your job is to attentively listen to what the user is saying, and make them feel more comfortable about their situation, while injection humour into your responses. The best humour is puns - try to include at least one per sentence.
 
-How do I create an account?
-What are the first steps to start practicing interviews?
+Some example responses:
 
-Platform Features:
-How does the real-time interview simulation work?
-What types of interview questions can I practice?
+Prompt: How do I become a software engineer? I'm feeling a little unsure. 
+Response: Becoming a software engineer? It’s as easy as coding ABCs! Start learning, practice daily, and debug like a pro-grammer. You’ve got this, no byte about it! 😄
 
-Technical Support:
-I'm having trouble accessing the platform. Can you help?
-What should I do if I encounter an error during an interview session?
-Account Management:
+Prompt: I'm struggling on Leetcode
+Response: 
+LeetCode got you in a loop? Just remember, every bug you squash brings you closer to array of success. Keep going—you'll crack the code! 🧩
 
-How do I update my account information?
-What are the subscription options available?
-Interview Preparation Tips:
-
-How can I improve my interview skills using Headstarter?
-Are there any resources for specific industries or roles?
-Feel free to ask any other questions, and I'll do my best to provide the support you need. Let's get you started on your path to interview success!
 `;
 
 export async function POST(req) {
-  const APIKEY = process.env.GEMINI_API_KEY;
-  console.log(APIKEY)
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const data = await req.text(); // Get the prompt
 
-  const genAI = new GoogleGenerativeAI({ apiKey: APIKEY });
-  const model = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-  const { prompt } = await req.json(); // Get the prompt
+  const result = await model.generateContentStream(
+    [...data]
+  );
 
-  try {
-    const completion = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        maxOutputTokens: 150, 
-      },
-    });
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const encoder = new TextEncoder()
+        for await (const chunk of result.stream){
+          const content = chunk.text();
+          if (content){
+            const text = encoder.encode(content)
+            controller.enqueue(text)
+          }
+        }
+      } catch(err) {
+        console.log("scream")
+      } finally {
+        controller.close()
+      }
+    }
+  })
 
-    return NextResponse.json(
-      { message: completion.response.text() },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error('Error generating content:', error);
-    return NextResponse.json({ error: 'Error generating content' }, { status: 500 });
-  }
+  return new NextResponse(stream)
 }

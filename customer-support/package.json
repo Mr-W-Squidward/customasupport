@@ -10,11 +10,8 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.16.0",
-<<<<<<< HEAD
     "@mui/material": "^5.16.7",
-=======
     "eslint": "^9.8.0",
->>>>>>> 97993dd280cae34ed228d0665768d36313a4b123
     "next": "14.2.5",
     "react": "^18",
     "react-dom": "^18"
